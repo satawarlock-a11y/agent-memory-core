@@ -1,5 +1,3 @@
-Markdown
-
 # Technical Specification: Obsidian-Based Agent Memory Pipeline
 
 This document outlines the low-level data flow and markdown parsing logic used by the agent to interface with the local Obsidian memory vault.
@@ -8,7 +6,7 @@ This document outlines the low-level data flow and markdown parsing logic used b
 
 ## 1. Data Flow Architecture
 
-The interaction between the OpenClaw Orchestrator, ComfyUI, and the Obsidian Vault follows a strict I/O loop:
+The interaction between the Orchestrator (OpenClaw) and the Obsidian Vault follows a strict I/O loop:
 
 ```text
   [User Request] 
@@ -19,11 +17,11 @@ The interaction between the OpenClaw Orchestrator, ComfyUI, and the Obsidian Vau
 │  Orchestrator │ ◄─────────────────────────── │   (Markdown Files)     │
 └───────┬───────┘    2. Inject Context/Rules   └────────────────────────┘
         │
-        │ 3. Dispatch Optimized Prompt
+        │ 3. Execute Task with Context
         ▼
 ┌───────────────┐
-│    ComfyUI    │ ───► [Qwen-VL Vision Feedback]
-│   Pipeline    │ ◄─── (Validates Output)
+│  Target LLM   │ ───► [Execution Output]
+│   Execution   │ 
 └───────┬───────┘
         │
         ▼
@@ -40,39 +38,39 @@ The interaction between the OpenClaw Orchestrator, ComfyUI, and the Obsidian Vau
 The Python layer (memory_manager.py) uses regex and YAML parsers to extract cognitive state directly from Markdown frontmatter.
 A. Episodic Memory Schema (/episodes/)
 
-Every generation event creates a timestamped file with the following structured metadata:
+Every execution event creates a timestamped file with the following structured metadata:
 YAML
 
 ---
 type: episodic_memory
 timestamp: YYYY-MM-DDTHH:MM:SS
-tags: [model_name, workflow_status, prompt_type]
+tags: [agent_state, session_id, task_type]
 status: completed | failed
 ---
 # Episode Title
 ## Execution Log
-[Raw prompts and ComfyUI seed parameters here]
+[Raw prompts and target agent decisions here]
 
 B. Semantic Concept Schema (/concepts/)
 
-Persistent rules, character references, and artistic constraints are stored as evergreen notes. The agent cross-references them using standard Wiki-links:
+Persistent rules, definitions, and user preferences are stored as evergreen notes. The agent cross-references them using standard Wiki-links:
 YAML
 
 ---
 type: concept_node
-category: character | style | constraint
+category: fact | rule | preference
 importance: high
 ---
-# [[Character-Name]]
-Features: Blue eyes, tactical gear.
-Associated Styles: [[Style-Cyberpunk]], [[Style-Grit]]
+# [[User-Preference]]
+Details: Prefers concise answers and Python-centric solutions.
+Associated Rules: [[System-Constraint]], [[Code-Style]]
 
 3. Context Retrieval & Injection Logic
 
-    Trigger: User sends a prompt: "Generate a picture of Character-A in a cyberpunk city."
+    Trigger: User sends a request to the agent.
 
-    Scan: The memory manager scans concepts/ for Character-A.md.
+    Scan: The memory manager scans concepts/ and episodes/ to extract matching metadata tags.
 
-    Link Resolution: It follows the internal Wiki-links [[Style-Cyberpunk]] inside that file to fetch associated style tags and negative prompts.
+    Link Resolution: It follows internal Wiki-links to fetch associated sub-rules or historical context.
 
-    Compilation: The script compiles the final system prompt for OpenClaw, combining active user input with historical constraints before hitting the ComfyUI API.
+    Compilation: The script compiles the final system prompt, combining active user input with historical constraints, before sending it to the LLM backend.
